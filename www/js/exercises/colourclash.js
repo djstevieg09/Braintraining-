@@ -38,7 +38,7 @@ export default {
     await ctx.race(new Promise(resolve => {
       let busy = false;
       const answer = async name => {
-        if (busy) return; busy = true;
+        if (busy || i >= count) return; busy = true;
         const right = name === items[i].ink.name;
         if (!right) wrong++;
         await mark(ctx.topPanel, right, 200);

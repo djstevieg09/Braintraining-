@@ -16,7 +16,7 @@ export async function sprint(ctx, questions, { penalty = 3, onShow } = {}) {
     let busy = false;
     ctx.input({
       onAnswer: (text, final) => {
-        if (busy) return false;
+        if (busy || i >= count) return false;
         const q = questions[i];
         const right = text === q.ans;
         if (!right && !final && text.length < q.ans.length) return false;
