@@ -1,0 +1,80 @@
+name: Build Play Store release
+
+# Run from the Actions tab ("Run workflow"), or push a tag like v1.0.0.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: Version shown in the store (e.g. 1.0.0)
+        required: true
+        default: 1.0.0
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Check signing secrets
+        env:
+          KS: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "::error::The UPLOAD_KEYSTORE_BASE64 secret is missing. Add the four signing secrets in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+      - name: Version
+        id: v
+        run: |
+          NAME="${{ github.event.inputs.version_name }}"
+          if [ -z "$NAME" ]; then NAME="${GITHUB_REF_NAME#v}"; fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+      - name: Turn off test features
+        run: |
+          printf "export const TEST_BUILD = false;\nexport const VERSION = '%s';\n" "${{ steps.v.outputs.name }}" > www/js/buildinfo.js
+          cat www/js/buildinfo.js
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Build signed release bundle
+        working-directory: android
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/upload.jks
+          KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          VERSION_CODE: ${{ steps.v.outputs.code }}
+          VERSION_NAME: ${{ steps.v.outputs.name }}
+        run: |
+          echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_FILE"
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+          rm -f "$KEYSTORE_FILE"
+      - name: Name the bundle
+        run: cp android/app/build/outputs/bundle/release/app-release.aab "Brainlark-${{ steps.v.outputs.name }}-${{ steps.v.outputs.code }}.aab"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brainlark-play-bundle
+          path: Brainlark-*.aab
+      - name: Publish to the "play-build" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: play-build
+          name: Brainlark Play Store bundle
+          prerelease: true
+          body: |
+            Signed release bundle for the Google Play Console, version ${{ steps.v.outputs.name }} (code ${{ steps.v.outputs.code }}).
+            Upload the .aab file in Play Console > Test and release. Do not install it directly; it is not an APK.
+          files: Brainlark-*.aab

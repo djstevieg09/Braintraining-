@@ -6,6 +6,7 @@ import { createAnswerInput, setUserSamples, createInkPad } from './ink.js';
 import { EXERCISES, byId, CHECK_POOL } from './exercises/index.js';
 import { voiceAvailable, ensurePermission } from './voice.js';
 import * as pay from './purchase.js';
+import { TEST_BUILD, VERSION } from './buildinfo.js';
 import { makeCard, shareImage } from './share.js';
 
 const MEDALS = [
@@ -39,7 +40,7 @@ const SPARK = `<svg class="spark" viewBox="0 0 120 120" aria-hidden="true">
 
 const fmtDate = (d = new Date()) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 const needsFull = ex => !ex.free && !pay.isFull();
-const dayOpen = ex => store.settings().unlockAll || store.daysTrained() >= ex.unlock;
+const dayOpen = ex => (TEST_BUILD && store.settings().unlockAll) || store.daysTrained() >= ex.unlock;
 const unlocked = ex => !needsFull(ex) && dayOpen(ex);
 const maxProfiles = () => pay.isFull() ? 4 : pay.FREE_PROFILES;
 
@@ -439,11 +440,11 @@ function settings() {
       ${row('music', 'Menu music', 'Gentle background tunes', st.music)}
       ${row('ink', 'Handwriting answers', 'Off uses a number keypad', p.input === 'ink')}
       ${row('voice', 'Voice answers', 'Say the colour out loud in Colour Clash', st.voice)}
-      ${row('unlockAll', 'Test unlock', 'Test builds only: acts as if Full is bought and opens every exercise', st.unlockAll)}
+      ${!TEST_BUILD ? '' : row('unlockAll', 'Test unlock', 'Test builds only: acts as if Full is bought and opens every exercise', st.unlockAll)}
       <button class="card" data-restore><div class="emoji" style="background:var(--panel-2)">↺</div><div><div class="name" style="font-size:16px">${store.settings().full ? 'Brainlark Full is active' : 'Restore purchase'}</div><div class="desc">${store.settings().full ? 'Thank you for your support!' : 'Already bought Full on this Google account? Get it back here'}</div></div></button>
       <button class="card" data-teach><div class="emoji" style="background:var(--yellow)">✍️</div><div><div class="name" style="font-size:16px">Teach my handwriting</div><div class="desc">${Object.keys(p.inkSamples || {}).length ? 'Saved. Tap to redo' : 'Write each number twice so answers are read better'}</div></div></button>
       <button class="card" data-del style="margin-top:10px"><div class="emoji" style="background:#f6d6d6">🗑</div><div><div class="name" style="font-size:16px">Delete ${esc(p.name)}</div><div class="desc">Removes this player and all their results</div></div></button>
-      <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">Brainlark 0.2 test build</div>
+      <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">Brainlark ${VERSION}${TEST_BUILD ? ' test build' : ''}</div>
     </div>`);
   s.querySelector('[data-back]').onclick = () => { sfx.tap(); home(); };
   s.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {

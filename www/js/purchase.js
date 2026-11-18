@@ -1,6 +1,7 @@
 // One-off "Brainlark Full" unlock through Google Play Billing
 // (cordova-plugin-purchase). No ads, no subscription.
 import * as store from './store.js';
+import { TEST_BUILD } from './buildinfo.js';
 
 export const PRODUCT_ID = 'brainlark_full';
 export const FALLBACK_PRICE = '£3.99';
@@ -11,7 +12,7 @@ const listeners = new Set();
 const notify = () => listeners.forEach(f => { try { f(); } catch {} });
 export const onChange = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 
-export const isFull = () => !!(store.settings().full || store.settings().unlockAll);
+export const isFull = () => !!(store.settings().full || (TEST_BUILD && store.settings().unlockAll));
 export const price = () => product?.pricing?.price || FALLBACK_PRICE;
 export const storeReady = () => ready && !!product && product.canPurchase !== false;
 

@@ -1,0 +1,11 @@
+<defs><radialGradient id="lg" cx="35%" cy="30%"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a3d"/></radialGradient></defs>
+  <circle cx="60" cy="62" r="50" fill="url(#lg)"/>
+  <path d="M56 40 Q48 22 38 24 Q48 28 50 40 Z M62 38 Q62 20 52 16 Q58 24 57 38 Z" fill="#2b2540"/>
+  <path d="M28 84 Q14 92 12 102 Q24 98 36 90 Z" fill="#2b2540"/>
+  <ellipse cx="58" cy="66" rx="32" ry="30" fill="#fffaf0"/>
+  <path d="M40 60 Q36 84 62 90 Q50 76 56 60 Z" fill="#ffb547"/>
+  <path d="M40 60 Q44 74 58 80" stroke="#e8913a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="68" cy="54" r="6" fill="#2b2540"/><circle cx="70" cy="52" r="2.2" fill="#fff"/>
+  <path d="M84 58 L100 62 L84 67 Z" fill="#2b2540"/>
+  <circle cx="74" cy="68" r="4" fill="#ff8a8a" opacity=".55"/>
+  <path d="M52 95 v8 M64 95 v8" stroke="#2b2540" stroke-width="3.5" stroke-linecap="round"/>
