@@ -1,8 +1,8 @@
-// One-off "BrainBlitz Full" unlock through Google Play Billing
+// One-off "Brainlark Full" unlock through Google Play Billing
 // (cordova-plugin-purchase). No ads, no subscription.
 import * as store from './store.js';
 
-export const PRODUCT_ID = 'brainblitz_full';
+export const PRODUCT_ID = 'brainlark_full';
 export const FALLBACK_PRICE = '£3.99';
 export const FREE_PROFILES = 1;
 

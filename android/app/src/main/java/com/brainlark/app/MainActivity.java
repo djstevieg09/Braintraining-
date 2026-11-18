@@ -1,4 +1,4 @@
-package com.brainblitz.app;
+package com.brainlark.app;
 
 import com.getcapacitor.BridgeActivity;
 

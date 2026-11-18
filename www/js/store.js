@@ -1,5 +1,5 @@
 // Local persistence (works offline inside the Android app).
-const KEY = 'brainblitz.v1';
+const KEY = 'brainlark.v1';
 const COLORS = ['#ff8a3d', '#20b8a8', '#ff5d8f', '#4d7cfe'];
 
 function blank() {
@@ -9,7 +9,7 @@ function blank() {
 let data = load();
 
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.profiles) return { ...blank(), ...d, settings: { ...blank().settings, ...d.settings } }; } catch {}
+  try { const d = JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('brainblitz.v1')); if (d && d.profiles) return { ...blank(), ...d, settings: { ...blank().settings, ...d.settings } }; } catch {}
   return blank();
 }
 export function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
