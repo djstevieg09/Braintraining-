@@ -15,11 +15,15 @@ export default {
     const pool = shuffle(WORDS);
     const target = pool.slice(0, count), decoys = pool.slice(count, count * 2);
 
-    // Study phase
-    ctx.top.innerHTML = `<div class="word-grid">${target.map(w => `<div class="w">${w}</div>`).join('')}</div>`;
-    ctx.bottom.innerHTML = `<div class="col" style="margin:auto;width:100%;align-items:center">
-      <div class="big" data-t>${studySecs}</div><div class="muted" style="font-weight:800">seconds to memorise</div>
-      <button class="btn teal" data-done style="width:100%;margin-top:14px">I'm ready</button></div>`;
+    // Study phase: hide the top panel so the whole list fits on short or
+    // landscape screens; timer and ready button share one row underneath.
+    const tp = ctx.topPanel, oldDisplay = tp.style.display;
+    tp.style.display = 'none'; ctx.onCleanup(() => { tp.style.display = oldDisplay; });
+    ctx.bottom.innerHTML = `<div class="muted" style="font-weight:800;text-align:center;margin-bottom:8px">Memorise these ${count} words</div>
+      <div class="scroll grow"><div class="word-grid compact">${target.map(w => `<div class="w">${w}</div>`).join('')}</div></div>
+      <div class="row" style="margin-top:10px;gap:10px;align-items:center">
+        <div class="big" data-t style="font-size:40px;min-width:64px;text-align:center">${studySecs}</div>
+        <button class="btn teal grow" data-done>I'm ready</button></div>`;
     const tEl = ctx.bottom.querySelector('[data-t]');
     await ctx.race(new Promise(resolve => {
       let left = studySecs;
@@ -31,11 +35,11 @@ export default {
     // Recall phase
     const all = shuffle([...target, ...decoys]);
     const chosen = new Set();
-    ctx.top.innerHTML = `<div class="title" style="font-size:24px">Which words did you see?</div>
-      <div class="subtitle">Pick up to ${count}. <b data-n>0</b> picked</div>`;
-    ctx.bottom.innerHTML = `<div class="scroll grow"><div class="word-grid">${all.map(w => `<button class="w" data-w="${w}">${w}</button>`).join('')}</div></div>
+    ctx.bottom.innerHTML = `<div data-head style="text-align:center;margin-bottom:8px"><div class="title" style="font-size:22px">Which words did you see?</div>
+      <div class="subtitle">Pick up to ${count}. <b data-n>0</b> picked</div></div>
+      <div class="scroll grow"><div class="word-grid compact">${all.map(w => `<button class="w" data-w="${w}">${w}</button>`).join('')}</div></div>
       <button class="btn" data-fin style="margin-top:10px">Finished</button>`;
-    const nEl = ctx.top.querySelector('[data-n]');
+    const nEl = ctx.bottom.querySelector('[data-n]');
     ctx.bottom.querySelector('.word-grid').onclick = e => {
       const b = e.target.closest('[data-w]'); if (!b) return;
       const w = b.dataset.w;
@@ -55,7 +59,7 @@ export default {
     });
     ctx.bottom.querySelector('[data-fin]').remove();
     sfx.sparkle();
-    ctx.top.innerHTML = `<div class="big">${good} / ${count}</div><div class="subtitle">${bad ? `${bad} wrong pick${bad > 1 ? 's' : ''}` : 'No wrong picks!'}</div>`;
+    ctx.bottom.querySelector('[data-head]').innerHTML = `<div class="big" style="font-size:44px">${good} / ${count}</div><div class="subtitle">${bad ? `${bad} wrong pick${bad > 1 ? 's' : ''}` : 'No wrong picks!'}</div>`;
     await ctx.race(sleep(2400));
     return { score: Math.max(0, good - bad), stats: { Remembered: `${good} / ${count}`, 'Wrong picks': bad }, opts: { count } };
   },

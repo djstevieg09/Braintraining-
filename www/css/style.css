@@ -207,8 +207,10 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .toggle::after { content: ""; position: absolute; top: 4px; left: 4px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .25s var(--spring); }
 .toggle.on { background: var(--teal); }
 .toggle.on::after { transform: translateX(24px); }
-.word-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+.word-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; width: 100%; }
 .word-grid .w { padding: 8px 4px; border-radius: 10px; background: var(--panel-2); font-weight: 800; font-size: 15px; text-align: center; transition: background .15s, color .15s, transform .12s; }
+.word-grid.compact { gap: 5px; }
+.word-grid.compact .w { padding: 6px 4px; }
 .word-grid button.w:active { transform: scale(.95); }
 .word-grid .w.sel { background: var(--blue); color: #fff; }
 .word-grid .w.good { background: var(--green); color: #fff; }
