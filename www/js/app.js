@@ -5,6 +5,7 @@ import { show, dualScreen, countdown, sleep, esc, h, confetti, countUp, lineChar
 import { createAnswerInput, setUserSamples, createInkPad } from './ink.js';
 import { EXERCISES, byId, CHECK_POOL } from './exercises/index.js';
 import { voiceAvailable, ensurePermission } from './voice.js';
+import * as pay from './purchase.js';
 
 const MEDALS = [
   { name: 'Warm-up', color: '#b9ad97', ring: '#9b8f7a' },
@@ -31,7 +32,10 @@ const SPARK = `<svg class="spark" viewBox="0 0 120 120" aria-hidden="true">
 </svg>`;
 
 const fmtDate = (d = new Date()) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-const unlocked = ex => store.settings().unlockAll || store.daysTrained() >= ex.unlock;
+const needsFull = ex => !ex.free && !pay.isFull();
+const dayOpen = ex => store.settings().unlockAll || store.daysTrained() >= ex.unlock;
+const unlocked = ex => !needsFull(ex) && dayOpen(ex);
+const maxProfiles = () => pay.isFull() ? 4 : pay.FREE_PROFILES;
 
 // ---------------- splash ----------------
 function splash() {
@@ -61,11 +65,13 @@ function profiles() {
         <div class="emoji" style="background:${p.color};color:#fff;font-weight:900">${esc(p.name[0].toUpperCase())}</div>
         <div><div class="name">${esc(p.name)}</div><div class="desc">${store.streak(p)} day streak · ${p.brainAge.length ? 'Brain Age ' + p.brainAge[p.brainAge.length - 1].age : 'No check yet'}</div></div>
       </button>`).join('')}
-      ${list.length < 4 ? `<button class="card" data-new><div class="emoji" style="background:var(--panel-2)">＋</div><div><div class="name">New player</div><div class="desc">Up to 4 players</div></div></button>` : ''}
+      ${list.length < maxProfiles() ? `<button class="card" data-new><div class="emoji" style="background:var(--panel-2)">＋</div><div><div class="name">New player</div><div class="desc">${pay.isFull() ? 'Up to 4 players' : 'Add your first player'}</div></div></button>`
+        : list.length < 4 ? `<button class="card locked" data-up><div class="emoji" style="background:var(--panel-2)">🔒</div><div><div class="name">Add more players</div><div class="desc">Up to 4 players with BrainBlitz Full</div></div></button>` : ''}
     </div>`);
   s.querySelector('.list').onclick = e => {
     const c = e.target.closest('.card'); if (!c) return; sfx.tap();
     if (c.dataset.new != null) return newProfile();
+    if (c.dataset.up != null) return upgrade('players', profiles);
     store.select(c.dataset.id); setUserSamples(store.current().inkSamples); home();
   };
 }
@@ -136,12 +142,16 @@ function home(back = true) {
         <div class="emoji" style="background:var(--blue)">📈</div>
         <div><div class="name">My Progress</div><div class="desc">Charts, stamps and best scores</div></div>
       </button>
+      ${pay.isFull() ? '' : `<button class="card" data-go="upgrade" style="background:linear-gradient(135deg,#fff3d6,#ffe1c7)">
+        <div class="emoji" style="background:var(--pink)">⭐</div>
+        <div><div class="name">Get BrainBlitz Full</div><div class="desc">All 15 exercises, charts and 4 players. One payment, no ads.</div></div>
+      </button>`}
     </div>`, { back });
   s.querySelector('[data-switch]').onclick = () => { sfx.tap(); profiles(); };
   s.querySelector('[data-settings]').onclick = () => { sfx.tap(); settings(); };
   s.querySelector('.list').onclick = e => {
     const g = e.target.closest('[data-go]')?.dataset.go; if (!g) return; sfx.tap();
-    ({ check: brainCheckIntro, train: training, progress })[g]();
+    ({ check: brainCheckIntro, train: training, progress, upgrade: () => upgrade('home', home) })[g]();
   };
 }
 const greeting = () => { const hr = new Date().getHours(); return hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening'; };
@@ -154,11 +164,11 @@ function training(back = false) {
     <div class="topbar"><button class="icon-btn" data-back>‹</button><h2>Daily Training</h2></div>
     <div class="list stagger scroll grow">
       ${EXERCISES.map(ex => {
-        const open = unlocked(ex), best = p.best[ex.id];
+        const open = unlocked(ex), best = p.best[ex.id], paid = needsFull(ex);
         return `<button class="card ${open ? '' : 'locked'}" data-id="${ex.id}">
           <div class="emoji" style="background:${ex.color}">${open ? ex.icon : '🔒'}</div>
-          <div class="grow"><div class="name">${ex.name}</div><div class="desc">${open ? ex.desc : `Unlocks after ${ex.unlock} day${ex.unlock > 1 ? 's' : ''} of training`}</div></div>
-          ${open ? (done.includes(ex.id) ? '<span class="badge done">✓ Today</span>' : best != null ? `<span class="badge">Best ${ex.format(best)}</span>` : '<span class="badge">New</span>') : ''}
+          <div class="grow"><div class="name">${ex.name}</div><div class="desc">${open ? ex.desc : paid ? ex.desc : `Unlocks after ${ex.unlock} day${ex.unlock > 1 ? 's' : ''} of training`}</div></div>
+          ${paid ? '<span class="badge" style="background:var(--pink);color:#fff">Full</span>' : open ? (done.includes(ex.id) ? '<span class="badge done">✓ Today</span>' : best != null ? `<span class="badge">Best ${ex.format(best)}</span>` : '<span class="badge">New</span>') : ''}
         </button>`;
       }).join('')}
     </div>`, { back });
@@ -166,6 +176,7 @@ function training(back = false) {
   s.querySelector('.list').onclick = e => {
     const c = e.target.closest('[data-id]'); if (!c) return;
     const ex = byId(c.dataset.id);
+    if (needsFull(ex)) { sfx.tap(); upgrade('exercise', () => training(true)); return; }
     if (!unlocked(ex)) { sfx.wrong(); c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 400); toast(`Train on ${ex.unlock} different day${ex.unlock > 1 ? 's' : ''} to unlock this`); return; }
     sfx.tap(); playTraining(ex);
   };
@@ -345,7 +356,7 @@ function progress() {
     <div class="scroll grow col" style="gap:12px">
       <div class="panel" style="padding:16px">
         <div class="row"><div class="name grow" style="font-weight:900;font-size:18px">Brain Age</div><span class="muted" style="font-weight:800">${ba.length} check${ba.length === 1 ? '' : 's'}</span></div>
-        ${lineChart(ba.map(b => b.age), { labels: ba.map(b => b.date.slice(5)), min: 20, max: 80, invert: false })}
+        ${pay.isFull() ? lineChart(ba.map(b => b.age), { labels: ba.map(b => b.date.slice(5)), min: 20, max: 80, invert: false }) : lockedChart(ba.length ? `Latest Brain Age: ${ba[ba.length - 1].age}` : 'No checks yet')}
       </div>
       <div class="panel" style="padding:16px">
         <div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:900;font-size:18px">${new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</div><span class="chip" style="background:var(--orange)">🔥 ${store.streak()}</span></div>
@@ -359,6 +370,7 @@ function progress() {
       </div>
     </div>`);
   s.querySelector('[data-back]').onclick = () => { sfx.tap(); home(); };
+  s.querySelector('[data-up]')?.addEventListener('click', () => { sfx.tap(); upgrade('charts', progress); });
   s.querySelector('.list').onclick = e => { const c = e.target.closest('[data-id]'); if (!c) return; sfx.tap(); exerciseProgress(byId(c.dataset.id)); };
 }
 
@@ -388,7 +400,7 @@ function exerciseProgress(ex) {
     <div class="panel" style="padding:16px">
       <div style="font-weight:900;font-size:18px">Best score each day</div>
       <div class="muted" style="font-weight:700;font-size:13px">${ex.better === 'lower' ? 'Lower is better' : 'Higher is better'}</div>
-      ${lineChart(days.map(d => byDay[d]), { labels: days.map(d => d.slice(5)) })}
+      ${pay.isFull() ? lineChart(days.map(d => byDay[d]), { labels: days.map(d => d.slice(5)) }) : lockedChart('Track every day with BrainBlitz Full')}
     </div>
     <div class="stat-grid">
       <div class="stat" style="background:var(--panel)"><b>${p.best[ex.id] != null ? ex.format(p.best[ex.id]) : '–'}</b><span>Personal best</span></div>
@@ -397,6 +409,7 @@ function exerciseProgress(ex) {
     <div class="grow"></div>
     ${unlocked(ex) ? '<button class="btn" data-play>Play now</button>' : ''}`, {});
   s.querySelector('[data-back]').onclick = () => { sfx.tap(); progress(); };
+  s.querySelector('[data-up]')?.addEventListener('click', () => { sfx.tap(); upgrade('charts', () => exerciseProgress(ex)); });
   s.querySelector('[data-play]')?.addEventListener('click', () => { sfx.tap(); playTraining(ex); });
 }
 
@@ -411,10 +424,11 @@ function settings() {
       ${row('music', 'Menu music', 'Gentle background tunes', st.music)}
       ${row('ink', 'Handwriting answers', 'Off uses a number keypad', p.input === 'ink')}
       ${row('voice', 'Voice answers', 'Say the colour out loud in Colour Clash', st.voice)}
-      ${row('unlockAll', 'Unlock everything', 'Test mode: open all exercises now', st.unlockAll)}
+      ${row('unlockAll', 'Test unlock', 'Test builds only: acts as if Full is bought and opens every exercise', st.unlockAll)}
+      <button class="card" data-restore><div class="emoji" style="background:var(--panel-2)">↺</div><div><div class="name" style="font-size:16px">${store.settings().full ? 'BrainBlitz Full is active' : 'Restore purchase'}</div><div class="desc">${store.settings().full ? 'Thank you for your support!' : 'Already bought Full on this Google account? Get it back here'}</div></div></button>
       <button class="card" data-teach><div class="emoji" style="background:var(--yellow)">✍️</div><div><div class="name" style="font-size:16px">Teach my handwriting</div><div class="desc">${Object.keys(p.inkSamples || {}).length ? 'Saved. Tap to redo' : 'Write each number twice so answers are read better'}</div></div></button>
       <button class="card" data-del style="margin-top:10px"><div class="emoji" style="background:#f6d6d6">🗑</div><div><div class="name" style="font-size:16px">Delete ${esc(p.name)}</div><div class="desc">Removes this player and all their results</div></div></button>
-      <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">BrainBlitz 0.1 test build</div>
+      <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">BrainBlitz 0.2 test build</div>
     </div>`);
   s.querySelector('[data-back]').onclick = () => { sfx.tap(); home(); };
   s.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
@@ -426,6 +440,12 @@ function settings() {
     else { store.setSetting(k, on); applySettings(); if (k === 'music' && on) audio.startMusic('menu'); }
   });
   s.querySelector('[data-teach]').onclick = () => { sfx.tap(); teachInk(); };
+  s.querySelector('[data-restore]').onclick = async () => {
+    sfx.tap(); if (store.settings().full) return;
+    const r = await pay.restore();
+    if (r === 'ok') { sfx.fanfare(); confetti(120); toast('BrainBlitz Full restored!'); settings(); }
+    else toast(r === 'none' ? 'No purchase found on this Google account' : 'The Play Store is not available right now');
+  };
   let armed = false;
   s.querySelector('[data-del]').onclick = e => {
     const c = e.currentTarget;
@@ -433,6 +453,56 @@ function settings() {
     store.deleteProfile(p.id); sfx.whoosh(); profiles();
   };
 }
+
+// ---------------- BrainBlitz Full ----------------
+function lockedChart(note) {
+  return `<div style="position:relative;margin-top:8px">
+    <svg viewBox="0 0 320 150" style="width:100%;display:block;filter:blur(3px);opacity:.5"><polyline points="20,120 70,100 120,108 170,80 220,70 270,52 305,40" fill="none" stroke="#ff8a3d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center"><div>
+      <div class="muted" style="font-weight:800;margin-bottom:8px">${esc(note)}</div>
+      <button class="btn pink small" data-up>🔒 Unlock charts</button></div></div></div>`;
+}
+
+function upgrade(reason, back = home) {
+  const perks = [
+    ['🧩', 'All 15 exercises', 'Head Count, Clock Reader, Light Trail, Number Place and more'],
+    ['📈', 'Progress charts', 'Watch your Brain Age and every score improve day by day'],
+    ['👨‍👩‍👧', 'Up to 4 players', 'Everyone in the family gets their own progress'],
+    ['🚫', 'No ads, ever', 'And no subscription. Pay once, keep it for good'],
+  ];
+  const s = show(`
+    <div class="topbar"><button class="icon-btn" data-back>‹</button><h2>BrainBlitz Full</h2></div>
+    <div class="panel" style="padding:20px;text-align:center">
+      ${SPARK}
+      <div class="title" style="font-size:26px;margin-top:6px">Unlock the full workout</div>
+      <div class="subtitle">One payment. Everything, forever.</div>
+    </div>
+    <div class="list stagger scroll grow">
+      ${perks.map(([i, t, d]) => `<div class="card" style="cursor:default"><div class="emoji" style="background:var(--panel-2)">${i}</div><div><div class="name" style="font-size:16px">${t}</div><div class="desc">${d}</div></div></div>`).join('')}
+    </div>
+    <button class="btn pink" data-buy style="min-height:62px;font-size:20px">Unlock for ${esc(pay.price())}</button>
+    <button class="btn ghost small" data-restore>Restore purchase</button>`);
+  const goBack = () => { sfx.tap(); back(); };
+  s.querySelector('[data-back]').onclick = goBack;
+  const buyBtn = s.querySelector('[data-buy]');
+  const off = pay.onChange(() => { buyBtn.textContent = `Unlock for ${pay.price()}`; if (pay.isFull()) done(); });
+  setCleanupOnce(off);
+  let finished = false;
+  const done = () => { if (finished) return; finished = true; off(); sfx.fanfare(); confetti(200); toast('Welcome to BrainBlitz Full! Everything is unlocked.'); home(); };
+  buyBtn.onclick = async () => {
+    sfx.tap(); buyBtn.disabled = true;
+    const r = await pay.buy();
+    buyBtn.disabled = false;
+    if (r === 'ok' || pay.isFull()) done();
+    else if (r === 'unavailable') toast('Purchases open once BrainBlitz is on the Play Store. In this test build, use Settings > Test unlock.', 3800);
+    else if (r === 'error') toast('The purchase did not go through. You have not been charged.');
+  };
+  s.querySelector('[data-restore]').onclick = async () => {
+    sfx.tap(); const r = await pay.restore();
+    if (r === 'ok' || pay.isFull()) done(); else toast(r === 'none' ? 'No purchase found on this Google account' : 'The Play Store is not available right now');
+  };
+}
+function setCleanupOnce(fn) { const scr = document.querySelector('.screen:not(.leave)'); const mo = new MutationObserver(() => { if (!scr.isConnected || scr.classList.contains('leave')) { fn(); mo.disconnect(); } }); mo.observe(scr, { attributes: true }); mo.observe(document.getElementById('app'), { childList: true }); }
 
 // ---------------- handwriting teaching ----------------
 function teachInk() {
@@ -474,4 +544,5 @@ CapApp?.addListener('backButton', () => {
   else if (store.current()) home();
 });
 
+pay.initPurchases();
 splash();

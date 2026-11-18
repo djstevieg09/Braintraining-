@@ -9,7 +9,7 @@ const COLS = [
 ];
 
 export default {
-  id: 'colour', name: 'Colour Clash', icon: '🎨', color: '#ff5d8f', unlock: 0,
+  free: true, id: 'colour', name: 'Colour Clash', icon: '🎨', color: '#ff5d8f', unlock: 0,
   desc: 'Name the ink, not the word', how: 'A colour word appears in a different colour of ink. Tap the colour of the INK, not what the word says.',
   better: 'lower',
   format: s => `${s.toFixed(1)} s`,

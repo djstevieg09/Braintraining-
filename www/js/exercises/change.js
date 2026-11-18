@@ -22,7 +22,7 @@ function makeQ(level) {
 }
 
 export default {
-  id: 'change', name: 'Coin Counter', icon: '🪙', color: '#e0a800', unlock: 1,
+  free: true, id: 'change', name: 'Coin Counter', icon: '🪙', color: '#e0a800', unlock: 1,
   desc: 'Add up a handful of coins', how: 'Add up the coins and write the total in pence. For example £1 and 20p is 120.',
   better: 'lower',
   format: s => `${s.toFixed(1)} s`,

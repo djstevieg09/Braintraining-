@@ -15,10 +15,10 @@ export async function sprint(ctx, questions, { penalty = 3, onShow } = {}) {
   await ctx.race(new Promise(resolve => {
     let busy = false;
     ctx.input({
-      onAnswer: (text, final) => {
+      onAnswer: (text, final, fits) => {
         if (busy || i >= count) return false;
         const q = questions[i];
-        const right = text === q.ans;
+        const right = text === q.ans || !!(fits && fits(q.ans));
         if (!right && !final && text.length < q.ans.length) return false;
         busy = true;
         if (!right) wrong++;

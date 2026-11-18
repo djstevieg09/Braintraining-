@@ -3,7 +3,7 @@ import { sfx } from '../audio.js';
 import { WORDS } from './words.js';
 
 export default {
-  id: 'words', name: 'Word Memory', icon: '📝', color: '#20b8a8', unlock: 0,
+  free: true, id: 'words', name: 'Word Memory', icon: '📝', color: '#20b8a8', unlock: 0,
   desc: 'Study a list, then spot the words', how: 'You get time to study a list of words. Then pick out every word you saw from a bigger list. Wrong picks cost a point.',
   better: 'higher',
   format: s => `${s} pts`,

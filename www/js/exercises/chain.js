@@ -24,7 +24,7 @@ export default {
       ctx.setCorners(`${i + 1} / ${steps}`, '');
       ctx.top.innerHTML = `<div class="subtitle" style="font-size:18px">Your total…</div><div class="huge bump" style="color:var(--pink)">${op} ${n}</div>`;
       const right = await ctx.race(new Promise(resolve => ctx.input({
-        onAnswer: (t, final) => { if (t !== ans && !final && t.length < ans.length) return false; resolve(t === ans); return true; },
+        onAnswer: (t, final, fits) => { const ok = t === ans || !!(fits && fits(ans)); if (!ok && !final && t.length < ans.length) return false; resolve(ok); return true; },
       })));
       if (!right) { wrong++; ctx.top.innerHTML = `<div class="subtitle">The total is now</div><div class="huge">${total}</div>`; }
       await mark(ctx.topPanel, right, right ? 260 : 1100);

@@ -92,7 +92,7 @@ export default {
       await ctx.race(sleep(300));
       await ctx.race(animate(ctx.top.querySelector('canvas'), p, ctx.quitPromise));
       ctx.top.innerHTML = '<div class="title">How many are inside?</div>';
-      const ans = await ctx.race(new Promise(resolve => ctx.input({ onAnswer: (t, final) => { if (!final && t.length < String(p.inside).length) return false; resolve(t); return true; } })));
+      const ans = await ctx.race(new Promise(resolve => ctx.input({ onAnswer: (t, final, fits) => { if (fits && fits(String(p.inside))) { resolve(String(p.inside)); return true; } if (!final && t.length < String(p.inside).length) return false; resolve(t); return true; } })));
       const ok = ans === String(p.inside);
       if (ok) right++;
       ctx.top.innerHTML = `<div class="big">${p.inside}</div><div class="subtitle">${ok ? 'Spot on!' : `You said ${ans}`}</div>`;

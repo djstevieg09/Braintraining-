@@ -22,10 +22,10 @@ export default {
       ctx.top.innerHTML = `<div class="big" style="letter-spacing:6px;color:var(--line)">${'?'.repeat(len)}</div><div class="muted" style="font-weight:800;margin-top:10px">Write the number</div>`;
       const right = await ctx.race(new Promise(resolve => {
         ctx.input({
-          onAnswer: (text, final) => {
-            if (!final && text.length < num.length && num.startsWith(text)) return false;
-            if (!final && text.length < num.length) return false;
-            resolve(text === num); return true;
+          onAnswer: (text, final, fits) => {
+            const ok = text === num || !!(fits && fits(num));
+            if (!ok && !final && text.length < num.length) return false;
+            resolve(ok); return true;
           },
         });
       }));

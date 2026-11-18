@@ -1,6 +1,7 @@
 // Handwriting input: a smooth ink pad plus a point-cloud digit recogniser
 // (based on the published $P algorithm), with optional per-player samples.
 import { sfx } from './audio.js';
+import { classify, render } from './digitnet.js';
 
 const N = 32;
 
@@ -68,7 +69,7 @@ const arc = (cx, cy, rx, ry, a0, a1, steps = 16) => Array.from({ length: steps +
 const seg = (...p) => p;
 const fig8 = Array.from({ length: 33 }, (_, i) => { const t = i / 32 * Math.PI * 2; return [50 + 28 * Math.sin(2 * t), 50 - 45 * Math.cos(t)]; });
 
-const RAW = {
+export const RAW = {
   0: [[arc(50, 50, 30, 45, -90, 270, 24)], [arc(50, 50, 20, 45, -90, 270, 24)], [arc(50, 50, 34, 42, -100, 250, 24)]],
   1: [[seg([50, 5], [50, 95])], [seg([34, 22], [50, 5], [50, 95])], [seg([34, 22], [50, 5], [50, 95]), seg([34, 95], [66, 95])], [seg([45, 5], [55, 95])]],
   2: [[[...arc(50, 30, 28, 25, -160, 40), [22, 95], [80, 95]]], [[...arc(50, 32, 30, 27, -170, 20), [20, 95], [82, 92]]], [[...arc(48, 28, 26, 24, -150, 60), [24, 94], [30, 88], [80, 95]]]],
@@ -135,7 +136,7 @@ export function groupStrokes(strokes) {
       const overlap = Math.min(b.maxX + pad, g.maxX + pad) - Math.max(b.minX - pad, g.minX - pad);
       const minW = Math.max(12, Math.min(b.maxX - b.minX, g.maxX - g.minX));
       const ratio = overlap / minW;
-      if (ratio > 0.35 && ratio > bestOverlap) { bestOverlap = ratio; target = g; }
+      if (ratio > 0.5 && ratio > bestOverlap) { bestOverlap = ratio; target = g; }
     }
     if (target) { target.items.push(b.i); target.minX = Math.min(target.minX, b.minX); target.maxX = Math.max(target.maxX, b.maxX); }
     else groups.push({ items: [b.i], minX: b.minX, maxX: b.maxX });
@@ -144,15 +145,42 @@ export function groupStrokes(strokes) {
   return groups.map(g => g.items.map(i => strokes[i]));
 }
 
-export function recogniseNumber(strokes) {
-  return groupStrokes(strokes).map(g => {
+// Per-player taught samples nudge the network's answer (point-cloud match).
+function userScores(points) {
+  const users = TEMPLATES.filter(t => t.user); if (!users.length) return null;
+  const cloud = normalize(points), best = {};
+  for (const t of users) { const d = greedy(cloud, t.cloud); if (best[t.digit] == null || d < best[t.digit]) best[t.digit] = d; }
+  const sc = new Array(10).fill(0); let tot = 0;
+  for (let k = 0; k < 10; k++) { if (best[k] == null) continue; sc[k] = Math.exp(-best[k] * 4); tot += sc[k]; }
+  return tot ? sc.map(v => v / tot) : null;
+}
+
+// Returns { text, probs } where probs[i] is the probability list for digit i.
+export function recogniseNumberDetailed(strokes) {
+  const groups = groupStrokes(strokes).filter(g => {
+    const xs = g.flat().map(p => p.x), ys = g.flat().map(p => p.y);
+    return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) > 6; // ignore stray dots
+  });
+  const probs = groups.map(g => {
+    let pr = classify(render(g));
     const pts = []; g.forEach((s, id) => s.forEach(p => pts.push({ x: p.x, y: p.y, id })));
-    return recogniseDigit(pts).digit;
-  }).join('');
+    const u = pts.length > 2 ? userScores(pts) : null;
+    if (u) pr = pr.map((v, k) => 0.65 * v + 0.35 * u[k]);
+    return pr;
+  });
+  const text = probs.map(pr => String(pr.indexOf(Math.max(...pr)))).join('');
+  return { text, probs };
+}
+export const recogniseNumber = strokes => recogniseNumberDetailed(strokes).text;
+
+// Forgiving check: would this answer be a reasonable reading of what was written?
+export function plausible(probs, ans) {
+  if (!probs || probs.length !== ans.length) return false;
+  return probs.every((pr, i) => { const p = pr[+ans[i]], top = Math.max(...pr); return p >= 0.2 || p >= top * 0.35; });
 }
 
 // ---------- ink pad UI ----------
-export function createInkPad(host, { onRecognise, delay = 550, hint = 'Write your answer here' } = {}) {
+export function createInkPad(host, { onRecognise, delay = 650, hint = 'Write your answer here' } = {}) {
   host.innerHTML = `<div class="inkpad"><canvas></canvas><div class="hint">${hint}</div><div class="read"></div></div>`;
   const pad = host.querySelector('.inkpad'), canvas = pad.querySelector('canvas');
   const hintEl = pad.querySelector('.hint'), readEl = pad.querySelector('.read');
@@ -196,9 +224,9 @@ export function createInkPad(host, { onRecognise, delay = 550, hint = 'Write you
     strokes.push(cur); cur = null; redraw();
     clearTimeout(timer);
     timer = setTimeout(() => {
-      const text = recogniseNumber(strokes);
+      const { text, probs } = recogniseNumberDetailed(strokes);
       readEl.textContent = text;
-      onRecognise && onRecognise(text, strokes);
+      onRecognise && onRecognise(text, strokes, probs);
     }, delay);
   }
   canvas.addEventListener('pointerdown', down);
@@ -225,7 +253,7 @@ export function createAnswerInput(host, { mode = 'ink', onAnswer, onModeChange, 
     const body = document.createElement('div'); body.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0';
     host.appendChild(body);
     if (mode === 'ink') {
-      inner = createInkPad(body, { onRecognise: text => { if (!destroyed && text && onAnswer(text, false)) inner.clear(); } });
+      inner = createInkPad(body, { onRecognise: (text, _s, probs) => { if (!destroyed && text && onAnswer(text, false, ans => plausible(probs, ans))) inner.clear(); } });
       const tools = document.createElement('div'); tools.className = 'input-tools';
       tools.innerHTML = `<button class="btn ghost small" data-a="clear">Erase</button>${allowSwitch ? '<button class="btn ghost small" data-a="keys">Keypad</button>' : ''}`;
       tools.onclick = e => {

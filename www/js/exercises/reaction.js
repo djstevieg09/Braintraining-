@@ -2,7 +2,7 @@ import { sleep, rand } from '../ui.js';
 import { sfx, haptic } from '../audio.js';
 
 export default {
-  id: 'reaction', name: 'Reaction Speed', icon: '⚡', color: '#ffc93c', unlock: 1,
+  free: true, id: 'reaction', name: 'Reaction Speed', icon: '⚡', color: '#ffc93c', unlock: 1,
   desc: 'Tap the moment the light turns green', how: 'Wait for the light to turn green, then tap the bottom panel as fast as you can. Tapping too early costs you that try.',
   better: 'lower',
   format: s => `${Math.round(s)} ms`,

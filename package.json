@@ -18,13 +18,14 @@
   },
   "homepage": "https://github.com/djstevieg09/braintraining-#readme",
   "dependencies": {
-    "@capacitor-community/speech-recognition": "^6.0.1",
-    "@capacitor/android": "^6.2.3",
-    "@capacitor/app": "^6.0.3",
-    "@capacitor/core": "^6.2.3"
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "cordova-plugin-purchase": "^13.20.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.3",
+    "@capacitor/cli": "^8.6.2",
     "@fontsource/nunito": "^5.3.0"
   }
 }

@@ -10,7 +10,7 @@ function makeQ() {
 }
 
 export default {
-  id: 'maths', name: 'Quick Maths', icon: '➕', color: '#ff8a3d', unlock: 0,
+  free: true, id: 'maths', name: 'Quick Maths', icon: '➕', color: '#ff8a3d', unlock: 0,
   desc: 'Race through simple sums', how: 'Solve each sum as fast as you can. Write the answer on the pad, or switch to the keypad.',
   better: 'lower',
   format: s => `${s.toFixed(1)} s`,
@@ -32,10 +32,10 @@ export default {
     await ctx.race(new Promise(resolve => {
       let busy = false;
       ctx.input({
-        onAnswer: (text, final) => {
+        onAnswer: (text, final, fits) => {
           if (busy || i >= count) return false;
           const q = qs[i];
-          const right = text === q.ans;
+          const right = text === q.ans || !!(fits && fits(q.ans));
           if (!right && !final && text.length < q.ans.length) return false;
           busy = true;
           if (!right) wrong++;

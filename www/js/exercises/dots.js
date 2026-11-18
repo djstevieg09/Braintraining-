@@ -42,7 +42,7 @@ export default {
       sfx.pop();
       await ctx.race(sleep(Math.max(700, 1300 - i * 50)));
       ctx.top.innerHTML = '<div class="title">How many dots?</div>';
-      const ans = await ctx.race(new Promise(res => ctx.input({ onAnswer: (t, final) => { if (!final && t.length < String(n).length) return false; res(+t); return true; } })));
+      const ans = await ctx.race(new Promise(res => ctx.input({ onAnswer: (t, final, fits) => { if (fits && fits(String(n))) { res(n); return true; } if (!final && t.length < String(n).length) return false; res(+t); return true; } })));
       const diff = Math.abs(ans - n);
       if (diff === 0) { pts += 2; exact++; } else if (diff === 1) pts += 1;
       ctx.top.innerHTML = `<div class="big">${n}</div><div class="subtitle">${diff === 0 ? 'Exactly right!' : diff === 1 ? 'So close! +1' : `You said ${ans}`}</div>`;
