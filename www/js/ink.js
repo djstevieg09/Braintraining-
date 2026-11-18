@@ -265,12 +265,12 @@ export function createAnswerInput(host, { mode = 'ink', onAnswer, onModeChange, 
       let val = '';
       body.innerHTML = `<div class="answer-line">&nbsp;</div><div class="keypad">${[7, 8, 9, 4, 5, 6, 1, 2, 3].map(k => `<button class="key" data-k="${k}">${k}</button>`).join('')}<button class="key del" data-k="del">⌫</button><button class="key" data-k="0">0</button><button class="key ok" data-k="ok">OK</button></div>`;
       const line = body.querySelector('.answer-line');
-      const show = () => line.innerHTML = val || '&nbsp;';
+      const show = () => { line.innerHTML = val || '&nbsp;'; line.style.fontSize = val.length > 8 ? '30px' : ''; };
       body.querySelector('.keypad').addEventListener('pointerdown', e => {
         const k = e.target.closest('button')?.dataset.k; if (!k) return; e.preventDefault(); sfx.tap();
         if (k === 'del') val = val.slice(0, -1);
         else if (k === 'ok') { if (val && onAnswer(val, true)) val = ''; }
-        else if (val.length < 6) { val += k; if (onAnswer(val, false)) val = ''; }
+        else if (val.length < 12) { val += k; if (onAnswer(val, false)) val = ''; }
         show();
       });
       inner = { clear() { val = ''; show(); } };
