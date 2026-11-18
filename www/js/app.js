@@ -2,8 +2,9 @@ import * as audio from './audio.js';
 import { sfx } from './audio.js';
 import * as store from './store.js';
 import { show, dualScreen, countdown, sleep, esc, h, confetti, countUp, lineChart, toast, quitWatcher, Quit, shuffle } from './ui.js';
-import { createAnswerInput, setUserSamples } from './ink.js';
+import { createAnswerInput, setUserSamples, createInkPad } from './ink.js';
 import { EXERCISES, byId, CHECK_POOL } from './exercises/index.js';
+import { voiceAvailable, ensurePermission } from './voice.js';
 
 const MEDALS = [
   { name: 'Warm-up', color: '#b9ad97', ring: '#9b8f7a' },
@@ -208,7 +209,8 @@ async function runExercise(ex, opts, { title, step } = {}) {
   try {
     await quit.race(new Promise(r => bottom.querySelector('[data-start]').onclick = () => { sfx.tap(); r(); }));
     bottom.innerHTML = ''; top.innerHTML = '';
-    await quit.race(countdown(top));
+    if (!ex.skipCountdown) await quit.race(countdown(top));
+    if (ex.id === 'colour' && store.settings().voice) ctx.voice = await ensurePermission();
     const res = await ex.run(ctx, opts);
     return res;
   } catch (e) {
@@ -408,7 +410,9 @@ function settings() {
       ${row('sound', 'Sound effects', 'Taps, chimes and fanfares', st.sound)}
       ${row('music', 'Menu music', 'Gentle background tunes', st.music)}
       ${row('ink', 'Handwriting answers', 'Off uses a number keypad', p.input === 'ink')}
+      ${row('voice', 'Voice answers', 'Say the colour out loud in Colour Clash', st.voice)}
       ${row('unlockAll', 'Unlock everything', 'Test mode: open all exercises now', st.unlockAll)}
+      <button class="card" data-teach><div class="emoji" style="background:var(--yellow)">✍️</div><div><div class="name" style="font-size:16px">Teach my handwriting</div><div class="desc">${Object.keys(p.inkSamples || {}).length ? 'Saved. Tap to redo' : 'Write each number twice so answers are read better'}</div></div></button>
       <button class="card" data-del style="margin-top:10px"><div class="emoji" style="background:#f6d6d6">🗑</div><div><div class="name" style="font-size:16px">Delete ${esc(p.name)}</div><div class="desc">Removes this player and all their results</div></div></button>
       <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">BrainBlitz 0.1 test build</div>
     </div>`);
@@ -416,13 +420,47 @@ function settings() {
   s.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
     const k = b.dataset.t; b.classList.toggle('on'); const on = b.classList.contains('on'); sfx.pop();
     if (k === 'ink') store.updateProfile(pp => { pp.input = on ? 'ink' : 'keys'; });
+    else if (k === 'voice' && on) {
+      voiceAvailable().then(okv => { if (!okv) { b.classList.remove('on'); toast('Voice answers need the Android app with speech recognition'); return; } ensurePermission().then(g => { store.setSetting('voice', g); if (!g) { b.classList.remove('on'); toast('Microphone permission is needed for voice answers'); } }); });
+    }
     else { store.setSetting(k, on); applySettings(); if (k === 'music' && on) audio.startMusic('menu'); }
   });
+  s.querySelector('[data-teach]').onclick = () => { sfx.tap(); teachInk(); };
   let armed = false;
   s.querySelector('[data-del]').onclick = e => {
     const c = e.currentTarget;
     if (!armed) { armed = true; sfx.wrong(); c.querySelector('.name').textContent = 'Tap again to delete for good'; return; }
     store.deleteProfile(p.id); sfx.whoosh(); profiles();
+  };
+}
+
+// ---------------- handwriting teaching ----------------
+function teachInk() {
+  const order = [];
+  for (let d = 0; d <= 9; d++) order.push(d, d);
+  const samples = {};
+  let k = 0;
+  const s = show(`
+    <div class="topbar"><button class="icon-btn" data-back>‹</button><h2>Teach my handwriting</h2></div>
+    <div class="panel top lined" style="flex-basis:30%"><span class="corner l" data-c></span><div class="muted" style="font-weight:800">Write this number once, the way you normally do</div><div class="huge bump" data-d style="color:var(--orange)"></div></div>
+    <div class="panel bottom"><div data-pad style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+      <div class="input-tools"><button class="btn ghost small" data-clear>Erase</button><button class="btn teal small" data-next>Next</button></div></div>`);
+  const pad = createInkPad(s.querySelector('[data-pad]'), { hint: 'Write the number here' });
+  const dEl = s.querySelector('[data-d]'), cEl = s.querySelector('[data-c]');
+  const render = () => { dEl.textContent = order[k]; dEl.classList.remove('bump'); void dEl.offsetWidth; dEl.classList.add('bump'); cEl.textContent = `${k + 1} / ${order.length}`; };
+  render();
+  s.querySelector('[data-back]').onclick = () => { sfx.tap(); pad.destroy(); settings(); };
+  s.querySelector('[data-clear]').onclick = () => { sfx.tap(); pad.clear(); };
+  s.querySelector('[data-next]').onclick = () => {
+    const strokes = pad.strokes();
+    if (!strokes.length) { sfx.wrong(); return; }
+    const pts = []; strokes.forEach((st, id) => st.forEach(p => pts.push({ x: Math.round(p.x), y: Math.round(p.y), id })));
+    (samples[order[k]] ||= []).push(pts);
+    sfx.correct(); pad.clear(); k++;
+    if (k >= order.length) {
+      store.updateProfile(p => { p.inkSamples = samples; });
+      setUserSamples(samples); pad.destroy(); sfx.fanfare(); confetti(120); toast('Got it! BrainBlitz now knows your handwriting.'); settings();
+    } else render();
   };
 }
 

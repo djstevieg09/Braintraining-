@@ -1,4 +1,7 @@
 import { pick, sleep, mark } from '../ui.js';
+import { listen } from '../voice.js';
+
+const SOUNDS = { red: 'RED', read: 'RED', bread: 'RED', blue: 'BLUE', blew: 'BLUE', green: 'GREEN', yellow: 'YELLOW', jello: 'YELLOW' };
 
 const COLS = [
   { name: 'RED', css: '#e53935' }, { name: 'BLUE', css: '#2f6cf6' },
@@ -24,22 +27,37 @@ export default {
     const start = performance.now();
     ctx.bottom.innerHTML = `<div class="swatches">${COLS.map(c => `<button class="btn ghost" data-c="${c.name}">${c.name.toLowerCase()}</button>`).join('')}</div>`;
     const render = () => {
-      ctx.setCorners(`${i + 1} / ${count}`, '');
+      ctx.setCorners(`${i + 1} / ${count}`, ctx.voice ? '🎤 Say the colour' : '');
       ctx.top.innerHTML = `<div class="huge bump" style="font-size:72px;color:${items[i].ink.css}">${items[i].word.name}</div>`;
     };
     render();
+    let stopVoice = null;
+    if (ctx.voice) {
+            ctx.setCorners(`1 / ${count}`, '🎤 Say the colour');
+    }
     await ctx.race(new Promise(resolve => {
       let busy = false;
-      ctx.bottom.querySelector('.swatches').addEventListener('pointerdown', async e => {
-        const b = e.target.closest('[data-c]'); if (!b || busy) return; e.preventDefault();
-        busy = true;
-        const right = b.dataset.c === items[i].ink.name;
+      const answer = async name => {
+        if (busy) return; busy = true;
+        const right = name === items[i].ink.name;
         if (!right) wrong++;
         await mark(ctx.topPanel, right, 200);
         i++; busy = false;
         if (i >= count) resolve(); else render();
+      };
+      ctx.bottom.querySelector('.swatches').addEventListener('pointerdown', e => {
+        const b = e.target.closest('[data-c]'); if (!b) return; e.preventDefault(); answer(b.dataset.c);
       });
+      if (ctx.voice) {
+        let seen = 0;
+        listen(text => {
+          const words = text.split(/\s+/).filter(Boolean);
+          if (words.length < seen) seen = 0;
+          for (; seen < words.length; seen++) { const c = SOUNDS[words[seen]]; if (c) { seen = words.length; answer(c); break; } }
+        }).then(stop => { stopVoice = stop; ctx.onCleanup(stop); });
+      }
     }));
+    if (stopVoice) stopVoice();
     const secs = (performance.now() - start) / 1000 + wrong * 3;
     await sleep(150);
     return { score: Math.round(secs * 10) / 10, stats: { Correct: `${count - wrong} / ${count}`, Penalty: `+${wrong * 3} s` }, opts: { count } };

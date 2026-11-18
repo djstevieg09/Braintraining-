@@ -103,7 +103,7 @@ export function countUp(el, to, { ms = 900, decimals = 0, suffix = '' } = {}) {
   const from = 0, start = performance.now();
   return new Promise(res => {
     (function f(t) {
-      const k = Math.min(1, (t - start) / ms), e = 1 - Math.pow(1 - k, 3);
+      const k = Math.max(0, Math.min(1, (t - start) / ms)), e = 1 - Math.pow(1 - k, 3);
       el.textContent = (from + (to - from) * e).toFixed(decimals) + suffix;
       if (k < 1) requestAnimationFrame(f); else res();
     })(start);
