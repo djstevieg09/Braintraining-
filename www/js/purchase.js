@@ -12,7 +12,18 @@ const listeners = new Set();
 const notify = () => listeners.forEach(f => { try { f(); } catch {} });
 export const onChange = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 
-export const isFull = () => !!(store.settings().full || (TEST_BUILD && store.settings().unlockAll));
+export const isFull = () => !!(store.settings().full || store.settings().reviewer || (TEST_BUILD && store.settings().unlockAll));
+
+// Google Play app review access: a code entered in Settings (tap the version
+// line 7 times) unlocks everything. Only the code's SHA-256 is stored here.
+const REVIEWER_HASH = 'decddece0a5d48becc9ea3b1b3e74cf52d86ef11bda5767aa751851309c873b2';
+export async function tryReviewerCode(code) {
+  const data = new TextEncoder().encode(String(code || '').trim().toUpperCase());
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  if (hex !== REVIEWER_HASH) return false;
+  store.setSetting('reviewer', true); notify(); return true;
+}
 export const price = () => product?.pricing?.price || FALLBACK_PRICE;
 export const storeReady = () => ready && !!product && product.canPurchase !== false;
 

@@ -40,7 +40,7 @@ const SPARK = `<svg class="spark" viewBox="0 0 120 120" aria-hidden="true">
 
 const fmtDate = (d = new Date()) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 const needsFull = ex => !ex.free && !pay.isFull();
-const dayOpen = ex => (TEST_BUILD && store.settings().unlockAll) || store.daysTrained() >= ex.unlock;
+const dayOpen = ex => (TEST_BUILD && store.settings().unlockAll) || store.settings().reviewer || store.daysTrained() >= ex.unlock;
 const unlocked = ex => !needsFull(ex) && dayOpen(ex);
 const maxProfiles = () => pay.isFull() ? 4 : pay.FREE_PROFILES;
 
@@ -444,8 +444,15 @@ function settings() {
       <button class="card" data-restore><div class="emoji" style="background:var(--panel-2)">↺</div><div><div class="name" style="font-size:16px">${store.settings().full ? 'Brainlark Full is active' : 'Restore purchase'}</div><div class="desc">${store.settings().full ? 'Thank you for your support!' : 'Already bought Full on this Google account? Get it back here'}</div></div></button>
       <button class="card" data-teach><div class="emoji" style="background:var(--yellow)">✍️</div><div><div class="name" style="font-size:16px">Teach my handwriting</div><div class="desc">${Object.keys(p.inkSamples || {}).length ? 'Saved. Tap to redo' : 'Write each number twice so answers are read better'}</div></div></button>
       <button class="card" data-del style="margin-top:10px"><div class="emoji" style="background:#f6d6d6">🗑</div><div><div class="name" style="font-size:16px">Delete ${esc(p.name)}</div><div class="desc">Removes this player and all their results</div></div></button>
-      <div class="muted center" style="font-weight:700;font-size:13px;margin-top:6px">Brainlark ${VERSION}${TEST_BUILD ? ' test build' : ''}</div>
+      <div class="muted center" data-ver style="font-weight:700;font-size:13px;margin-top:6px">Brainlark ${VERSION}${TEST_BUILD ? ' test build' : ''}${st.reviewer ? ' · review access' : ''}</div>
+      <div class="card" data-rev style="cursor:default;display:none"><div class="grow"><div class="name" style="font-size:16px">Review access code</div><input data-rev-in autocomplete="off" autocapitalize="characters" style="width:100%;font-size:18px;padding:8px;margin-top:6px;border-radius:10px;border:2px solid var(--panel-2)"></div><button class="btn small" data-rev-go>OK</button></div>
     </div>`);
+  let verTaps = 0;
+  s.querySelector('[data-ver]').onclick = () => { if (++verTaps >= 7) { s.querySelector('[data-rev]').style.display = ''; s.querySelector('[data-rev-in]').focus(); } };
+  s.querySelector('[data-rev-go]').onclick = async () => {
+    const ok = await pay.tryReviewerCode(s.querySelector('[data-rev-in]').value);
+    if (ok) { sfx.fanfare(); toast('Review access on. Everything is unlocked.'); settings(); } else { sfx.wrong(); toast('That code is not right'); }
+  };
   s.querySelector('[data-back]').onclick = () => { sfx.tap(); home(); };
   s.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
     const k = b.dataset.t; b.classList.toggle('on'); const on = b.classList.contains('on'); sfx.pop();
