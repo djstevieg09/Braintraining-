@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BrainBlitz</string>
+    <string name="title_activity_main">BrainBlitz</string>
+    <string name="package_name">com.brainblitz.app</string>
+    <string name="custom_url_scheme">com.brainblitz.app</string>
+</resources>
